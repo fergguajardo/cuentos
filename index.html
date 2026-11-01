@@ -1015,7 +1015,7 @@ if(!nav||!main)return;
 const groups=[['Thriller',['Bela','Principita','Mandala']],['Drama',['Latte','Adorni','Sándalo']],['Comedia',['Baba Yaga','Roberto','Barniz']],['Sin clasificar',[]]];
 const normalize=text=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^\s*(?:✦\s*)?\d+[.)]?\s*/,'').trim().toLowerCase();
 let selected=0,stories=[];
-const icons=Array.from(nav.querySelectorAll('svg'),svg=>svg.outerHTML);
+const icons=["<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/></svg>", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8\"/></svg>", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M18 14l4 4-4 4M18 2l4 4-4 4M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22M2 6h1.972a4 4 0 0 1 3.6 2.2M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45\"/></svg>"];
 icons.push('<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>');
 nav.replaceChildren();nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Géneros de la antología');main.id='anthology-stories';main.setAttribute('role','tabpanel');
 const buttons=groups.map(([name],index)=>{const button=document.createElement('button');button.type='button';button.id='genre-tab-'+index;button.setAttribute('role','tab');button.setAttribute('aria-controls',main.id);button.innerHTML=icons[index];button.append(document.createTextNode(name));button.onclick=()=>select(index);button.onkeydown=event=>{const available=buttons.map((button,i)=>button.hidden?null:i).filter(i=>i!==null),position=available.indexOf(index);let next;if(event.key==='ArrowRight')next=available[(position+1)%available.length];else if(event.key==='ArrowLeft')next=available[(position+available.length-1)%available.length];else if(event.key==='Home')next=available[0];else if(event.key==='End')next=available[available.length-1];else return;event.preventDefault();select(next);buttons[next].focus()};nav.append(button);return button});
@@ -1032,10 +1032,20 @@ function organize(){
  const items=Array.from(main.querySelectorAll('#indice > .toc > li, #indice > .published-index > li'));
  stories=Array.from(main.querySelectorAll('.published-story'),(story,position)=>{const name=normalize(story.querySelector('h1')?.textContent||story.getAttribute('aria-label')||'');const group=groups.findIndex(([,names])=>names.some(title=>normalize(title)===name));const item=items.find(item=>{const href=item.querySelector('a')?.getAttribute('href');if(!href?.startsWith('#'))return false;const target=document.getElementById(href.slice(1));return target&&(target===story||story.contains(target))});return {story,item,name,group:group<0?3:group,position}});
  stories.sort((a,b)=>a.group-b.group||(a.group===3?a.position-b.position:groups[a.group][1].findIndex(name=>normalize(name)===a.name)-groups[b.group][1].findIndex(name=>normalize(name)===b.name)));
- for(const entry of stories){entry.story.parentElement.append(entry.story);if(entry.item)entry.item.parentElement.append(entry.item)}
+ for(const [index,entry] of stories.entries()){
+  const heading=entry.story.querySelector('h1'),prefix=(index+1)+'. ';
+  if(heading){
+   const match=heading.textContent.match(/^\s*(?:✦\s*)?\d+[.)]\s*/);
+   if(!match)heading.prepend(document.createTextNode(prefix));
+   else if(match[0]!==prefix){let remaining=match[0].length,first=true;const walker=document.createTreeWalker(heading,NodeFilter.SHOW_TEXT),nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);for(const node of nodes){if(!remaining)break;const length=Math.min(remaining,node.textContent.length);node.textContent=(first?prefix:'')+node.textContent.slice(length);remaining-=length;first=false}}
+   entry.story.setAttribute('aria-label',heading.textContent.trim());
+  }
+  const number=entry.item?.querySelector('.toc-num');if(number)number.textContent=String(index+1);
+  entry.story.parentElement.append(entry.story);if(entry.item)entry.item.parentElement.append(entry.item)
+ }
  buttons[3].hidden=!stories.some(entry=>entry.group===3);select(selected);followHash();
 }
-document.addEventListener('disociados:published',organize);window.addEventListener('hashchange',followHash);organize();
+document.addEventListener('disociados:published',organize);document.addEventListener('kairos:document-refreshed',organize);window.addEventListener('hashchange',followHash);organize();
 })();
 </script></body></html>
 
